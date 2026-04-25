@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Krabs Rush - Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background: linear-gradient(to bottom, #87ceeb, #90ee90);
+            border: 5px solid #333;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #87ceeb 0%, #90ee90 100%);
+        }
+
+        .ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .score {
+            margin-bottom: 10px;
+        }
+
+        .level {
+            margin-bottom: 10px;
+        }
+
+        .game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .game-over-screen.show {
+            display: flex;
+        }
+
+        .game-over-text {
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
+        }
+
+        .final-score {
+            color: #ffff00;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .restart-btn {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: #ff5252;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 50;
+            display: none;
+            max-width: 300px;
+        }
+
+        .instructions.show {
+            display: block;
+        }
+
+        .instructions h2 {
+            margin-bottom: 15px;
+            color: #ffff00;
+        }
+
+        .instructions p {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .start-btn {
+            padding: 10px 25px;
+            font-size: 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .start-btn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <div class="ui">
+            <div class="score">💰 Score: <span id="scoreValue">0</span></div>
+            <div class="level">📈 Level: <span id="levelValue">1</span></div>
+        </div>
+
+        <div class="instructions show" id="instructions">
+            <h2>🦀 Mr. Krabs Rush 🦀</h2>
+            <p><strong>Objective:</strong> Collect coins and avoid enemies!</p>
+            <p><strong>Controls:</strong></p>
+            <p>← → Arrow Keys or A/D to move</p>
+            <p>↑ Up Arrow or W to jump</p>
+            <p><strong>Rules:</strong></p>
+            <p>🪙 Collect coins = +10 points</p>
+            <p>👾 Hit enemy = Game Over!</p>
+            <p>⚡ Speed increases every 50 points</p>
+            <button class="start-btn" onclick="startGame()">START GAME</button>
+        </div>
+
+        <div class="game-over-screen" id="gameOverScreen">
+            <div class="game-over-text">GAME OVER!</div>
+            <div class="final-score">Final Score: <span id="finalScore">0</span></div>
+            <button class="restart-btn" onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Variables
+        let gameRunning = false;
+        let score = 0;
+        let level = 1;
+        let gameSpeed = 3;
+
+        // Mr. Krabs
+        const player = {
+            x: 175,
+            y: 500,
+            width: 40,
+            height: 40,
+            velocityY: 0,
+            jumping: false,
+            speed: 5
+        };
+
+        let coins = [];
+        let enemies = [];
+        let platforms = [];
+
+        // Initialize game
+        function init() {
+            coins = [];
+            enemies = [];
+            platforms = [];
+            
+            // Create initial coins
+            for (let i = 0; i < 3; i++) {
+                coins.push({
+                    x: Math.random() * (canvas.width - 20),
+                    y: Math.random() * (canvas.height - 100),
+                    width: 15,
+                    height: 15,
+                    collected: false
+                });
+            }
+
+            // Create initial enemies
+            for (let i = 0; i < 2; i++) {
+                enemies.push({
+                    x: Math.random() * (canvas.width - 40),
+                    y: Math.random() * (canvas.height - 200),
+                    width: 35,
+                    height: 35,
+                    speed: gameSpeed + 2
+                });
+            }
+
+            // Reset player position
+            player.x = 175;
+            player.y = 500;
+            player.velocityY = 0;
+            player.jumping = false;
+        }
+
+        function startGame() {
+            document.getElementById('instructions').classList.remove('show');
+            gameRunning = true;
+            init();
+            gameLoop();
+        }
+
+        function restartGame() {
+            score = 0;
+            level = 1;
+            gameSpeed = 3;
+            document.getElementById('scoreValue').textContent = score;
+            document.getElementById('levelValue').textContent = level;
+            document.getElementById('gameOverScreen').classList.remove('show');
+            startGame();
+        }
+
+        // Input handling
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if ((e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && gameRunning) {
+                if (!player.jumping) {
+                    player.velocityY = -12;
+                    player.jumping = true;
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Update player position
+        function updatePlayer() {
+            // Move left/right
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                player.x -= player.speed;
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                player.x += player.speed;
+            }
+
+            // Keep player in bounds
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+            // Gravity
+            player.velocityY += 0.6;
+            player.y += player.velocityY;
+
+            // Floor collision
+            if (player.y + player.height >= canvas.height) {
+                player.y = canvas.height - player.height;
+                player.jumping = false;
+                player.velocityY = 0;
+            }
+
+            // Game over if player goes above screen (fell)
+            if (player.y < -50) {
+                endGame();
+            }
+        }
+
+        // Update coins
+        function updateCoins() {
+            coins.forEach((coin, index) => {
+                coin.y += gameSpeed;
+
+                // Coin out of bounds
+                if (coin.y > canvas.height) {
+                    coin.y = -20;
+                    coin.x = Math.random() * (canvas.width - 20);
+                    coin.collected = false;
+                }
+
+                // Collision with player
+                if (!coin.collected && checkCollision(player, coin)) {
+                    score += 10;
+                    coin.collected = true;
+                    coin.y = -50;
+
+                    // Update level
+                    level = Math.floor(score / 50) + 1;
+                    gameSpeed = 3 + (level - 1) * 0.5;
+
+                    document.getElementById('scoreValue').textContent = score;
+                    document.getElementById('levelValue').textContent = level;
+                }
+            });
+        }
+
+        // Update enemies
+        function updateEnemies() {
+            enemies.forEach((enemy, index) => {
+                enemy.y += enemy.speed;
+                enemy.x += Math.sin(enemy.y / 30) * 2; // Wavy movement
+
+                // Enemy out of bounds
+                if (enemy.y > canvas.height) {
+                    enemy.y = -40;
+                    enemy.x = Math.random() * (canvas.width - 40);
+                    enemy.speed = gameSpeed + 2;
+                }
+
+                // Collision with player
+                if (checkCollision(player, enemy)) {
+                    endGame();
+                }
+            });
+
+            // Spawn new enemy occasionally
+            if (enemies.length < 2 + level) {
+                if (Math.random() < 0.01) {
+                    enemies.push({
+                        x: Math.random() * (canvas.width - 40),
+                        y: -40,
+                        width: 35,
+                        height: 35,
+                        speed: gameSpeed + 2
+                    });
+                }
+            }
+        }
+
+        // Collision detection
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Draw everything
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = 'rgba(135, 206, 235, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player (Mr. Krabs)
+            ctx.fillStyle = '#FF6B6B';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Draw eyes
+            ctx.fillStyle = 'white';
+            ctx.fillRect(player.x + 8, player.y + 8, 8, 8);
+            ctx.fillRect(player.x + 24, player.y + 8, 8, 8);
+            ctx.fillStyle = 'black';
+            ctx.fillRect(player.x + 10, player.y + 10, 4, 4);
+            ctx.fillRect(player.x + 26, player.y + 10, 4, 4);
+
+            // Draw coins
+            coins.forEach(coin => {
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(coin.x + 7.5, coin.y + 7.5, 7.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#FFA500';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw enemies (Plankton)
+            enemies.forEach(enemy => {
+                ctx.fillStyle = '#90EE90';
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                // Enemy eyes
+                ctx.fillStyle = 'black';
+                ctx.fillRect(enemy.x + 8, enemy.y + 8, 6, 6);
+                ctx.fillRect(enemy.x + 21, enemy.y + 8, 6, 6);
+            });
+        }
+
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').classList.add('show');
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            updatePlayer();
+            updateCoins();
+            updateEnemies();
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initial draw
+        draw();
+    </script>
+</body>
+</html>
